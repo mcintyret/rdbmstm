@@ -16,9 +16,9 @@ public class Shell {
         Database database = new Database("first_db");
 
         Map<String, ColumnDefinition> dataTypes = new LinkedHashMap<>();
-        dataTypes.put("foo", new ColumnDefinition(DataType.FLOAT));
-        dataTypes.put("bar", new ColumnDefinition(DataType.INTEGER));
-        dataTypes.put("baz", new ColumnDefinition(DataType.STRING));
+        dataTypes.put("foo", new ColumnDefinition(DataType.FLOAT, false, true)); // Unique
+        dataTypes.put("bar", new ColumnDefinition(DataType.INTEGER)); // Not nullable but not unique
+        dataTypes.put("baz", new ColumnDefinition(DataType.STRING, true, false)); //nullable
 
         Table table = new Table("table_1", dataTypes);
 

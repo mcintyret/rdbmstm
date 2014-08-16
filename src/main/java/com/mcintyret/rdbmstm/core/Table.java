@@ -125,8 +125,11 @@ public class Table implements Relation {
         List<Tuple> tuplesBeforeUpdate = new ArrayList<>(removed.size());
         List<Tuple> tuplesAfterUpdate = new ArrayList<>(removed.size());
         try {
-            for (Tuple tuple : removed) {
+            Iterator<Tuple> removedIt = removed.iterator();
+            while (removedIt.hasNext()) {
+                Tuple tuple = removedIt.next();
                 tuplesBeforeUpdate.add(tuple.copy());
+                removedIt.remove();
 
                 // now update the original tuple
                 for (Map.Entry<String, Value> entry : updates.entrySet()) {
@@ -145,7 +148,16 @@ public class Table implements Relation {
         } catch (SqlException e) {
             // rollback.
             rows.removeAll(tuplesAfterUpdate);
-            rows.addAll(tuplesBeforeUpdate);
+            for (Tuple tuple : tuplesAfterUpdate) {
+                removeFromIndices(tuple);
+            }
+
+            for (Tuple tuple : tuplesBeforeUpdate) {
+                addTuple(tuple);
+            }
+            for (Tuple tuple : removed) {
+                addTuple(tuple);
+            }
 
             throw e;
         }
@@ -171,7 +183,7 @@ public class Table implements Relation {
             getColumnDefinitions() :
             new AliasedMap<>(colAliases, columnDefinitions);
 
-        Stream<Tuple> rows = filter(predicate).map((tuple) -> {
+        Stream<? extends Tuple> rows = filter(predicate).map((tuple) -> {
             final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
 
             return new Tuple() {

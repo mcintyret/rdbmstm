@@ -1,5 +1,7 @@
 package com.mcintyret.rdbmstm.query;
 
+import static com.mcintyret.rdbmstm.collect.CollectUtils.toMap;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -74,8 +76,7 @@ public class Parser {
         Table table = database.get(tableName);
 
         assertNextToken("set", parts);
-        List<String> colNames = new ArrayList<>();
-        List<Value> values = new ArrayList<>();
+        Map<String, Value> values = new HashMap<>();
         String currentCol = null;
 
         int i = 0;
@@ -84,15 +85,18 @@ public class Parser {
             if ("where".equals(part)) {
                 break;
             }
-            switch (i++ % 3) {
+            switch (i++ % 4) {
                 case 0:
-                    colNames.add(currentCol = part);
+                    currentCol = part;
                     break;
                 case 1:
                     assertToken("=", part);
                     break;
                 case 2:
-                    values.add(parseValue(part, currentCol, table));
+                    values.put(currentCol, parseValue(part, currentCol, table));
+                    break;
+                case 3:
+                    assertToken(",", part);
                     break;
                 default:
                     throw new AssertionError();
@@ -100,16 +104,14 @@ public class Parser {
             }
         }
 
-        if (colNames.isEmpty()) {
+        if (values.isEmpty()) {
             throw new SqlParseException("Must update at least one column in UPDATE statment");
-        } else if (colNames.size() != values.size()) {
-            throw new SqlParseException("Different number of column names and new values");
         }
 
-        Predicate<Tuple> predicate = parseWhere(parts, table);
+        Predicate<Tuple> predicate = parsePredicate(parts, table);
 
         return database -> {
-            table.update(colNames, values, predicate);
+            System.out.println(table.update(values, predicate) + " rows updated");
         };
     }
 
@@ -125,7 +127,7 @@ public class Parser {
         Collection<Value> values = parseValues(parts, cols, table);
 
         return database -> {
-            table.insert(cols, values);
+            table.insert(toMap(cols, values));
             System.out.println("Successfully inserted row");
         };
 
@@ -354,12 +356,7 @@ public class Parser {
         if (parts.hasNext()) {
             assertNextToken("where", parts);
 
-            try {
-                return parsePredicate(parts, relation);
-            } catch (NoSuchElementException e) {
-                throw new SqlParseException("WHERE clause incomplete or not formatted propertly");
-            }
-
+            return parsePredicate(parts, relation);
         }
         return null;
     }
