@@ -43,18 +43,29 @@ public class Parser {
                 case "update":
                     return parseUpdate(parts);
                 case "delete":
-//                    return parseDelete(parts);
-                    break;
+                    return parseDelete(parts);
                 case "insert":
                     return parseInsert(parts);
                 default:
                     throw new SqlParseException("Cannot parse query: " + sql);
             }
+        } catch (NoSuchElementException e) {
+            throw new SqlParseException("SQL statement truncated unexpectedly: " + sql);
         } catch (SqlParseException e) {
             throw new SqlParseException("Error parsing sql '" + sql + "': " + e.getMessage(), e);
         }
 
         throw new SqlParseException("Not handled yet: " + sql);
+    }
+
+    private Query parseDelete(PeekableIterator<String> parts) {
+        assertNextToken("from", parts);
+
+        Table table = database.get(parts.next());
+
+        Predicate<Tuple> predicate = parseWhere(parts, table);
+
+        return database -> System.out.println(table.delete(predicate) + " rows deleted");
     }
 
     private Query parseUpdate(Iterator<String> parts) throws SqlParseException {
