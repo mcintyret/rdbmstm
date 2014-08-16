@@ -1,10 +1,24 @@
 package com.mcintyret.rdbmstm.core;
 
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.Map;
+
 public class Value {
 
     private final DataType dataType;
 
     private final Object value;
+
+    private static final Map<DataType, Value> NULL_VALUE_CACHE = makeNullValues();
+
+    private static Map<DataType, Value> makeNullValues() {
+        Map<DataType, Value> map = new EnumMap<>(DataType.class);
+        for (DataType dt : DataType.values()) {
+            map.put(dt, new Value(dt, null));
+        }
+        return Collections.unmodifiableMap(map);
+    }
 
     private Value(DataType dataType, Object value) {
         this.dataType = dataType;
@@ -24,7 +38,7 @@ public class Value {
     }
 
     public static Value nullOf(DataType dataType) {
-        return new Value(dataType, null);
+        return NULL_VALUE_CACHE.get(dataType);
     }
 
     @Override
@@ -48,6 +62,10 @@ public class Value {
 
     public DataType getDataType() {
         return dataType;
+    }
+
+    public boolean isNull() {
+        return value == null;
     }
 
     @Override

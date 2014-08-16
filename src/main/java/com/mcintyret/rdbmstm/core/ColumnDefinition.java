@@ -25,7 +25,7 @@ public class ColumnDefinition {
     }
 
     public Value getDefaultValue() {
-        return null;
+        return Value.nullOf(dataType);
     }
 
     public DataType getDataType() {

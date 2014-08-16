@@ -2,6 +2,7 @@ package com.mcintyret.rdbmstm.core;
 
 import java.util.AbstractCollection;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.mcintyret.rdbmstm.SqlException;
@@ -36,6 +37,7 @@ public abstract class Tuple extends AbstractCollection<Value> {
     public abstract Map<String, Value> getValues();
 
     @Override
+    // TODO: is ordering important to equals / hashCode?
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
@@ -47,6 +49,7 @@ public abstract class Tuple extends AbstractCollection<Value> {
     }
 
     @Override
+    // TODO: is ordering important to equals / hashCode?
     public int hashCode() {
         return getValues().hashCode();
     }
@@ -59,5 +62,20 @@ public abstract class Tuple extends AbstractCollection<Value> {
     @Override
     public Iterator<Value> iterator() {
         return getValues().values().iterator();
+    }
+
+    public Tuple copy() {
+        final Map<String, Value> values = new LinkedHashMap<>(getValues());
+        return new Tuple() {
+            @Override
+            public Map<String, ColumnDefinition> getColumnDefinitions() {
+                return Tuple.this.getColumnDefinitions();
+            }
+
+            @Override
+            public Map<String, Value> getValues() {
+                return values;
+            }
+        };
     }
 }

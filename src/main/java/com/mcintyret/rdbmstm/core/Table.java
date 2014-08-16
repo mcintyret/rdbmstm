@@ -1,5 +1,6 @@
 package com.mcintyret.rdbmstm.core;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -25,15 +25,21 @@ public class Table implements Relation {
 
     private final Set<Tuple> rows = new HashSet<>();
 
+    private final Map<String, Index> indices = new HashMap<>();
+
     public Table(String name, Map<String, ColumnDefinition> columnDefinitions) {
         this.name = name;
         this.columnDefinitions.putAll(columnDefinitions);
+
+        for (Map.Entry<String, ColumnDefinition> entry : columnDefinitions.entrySet()) {
+            if (entry.getValue().isUnique()) {
+                // Create an index for all unique columns
+                indices.put(entry.getKey(), new Index(entry.getKey()));
+            }
+        }
     }
 
-    public void insert(Collection<String> colNames, Collection<Value> values) {
-        if (colNames.size() != values.size()) {
-            throw new AssertionError();
-        }
+    public void insert(Map<String, Value> values) {
 
         final Map<String, Value> tupleValues = new HashMap<>();
         Tuple tuple = new Tuple() {
@@ -48,36 +54,103 @@ public class Table implements Relation {
             }
         };
 
-        setTupleValues(colNames, values, tuple);
+        insetTupleValues(values, tuple);
 
-        if (!rows.add(tuple)) {
-            throw new SqlException("Values " + values + " cannot be inserted into columns " + colNames + ": duplicate row");
+        addTuple(tuple);
+    }
+
+    private void addTuple(Tuple tuple) {
+        // add to indices
+        List<Index> addedIndices = new ArrayList<>(indices.size());
+        try {
+            for (Index index : indices.values()) {
+                index.add(tuple);
+                addedIndices.add(index);
+            }
+
+            if (!rows.add(tuple)) {
+                throw new SqlException("Values " + tuple.getValues().values() + " cannot be inserted into columns "
+                    + tuple.getValues().keySet() + ": duplicate row");
+            }
+        } catch (SqlException e) {
+            // Rollback adding to the indices if one of them complained
+            removeFromIndices(addedIndices, tuple);
+
+            throw e;
         }
     }
 
-    private void setTupleValues(Collection<String> colNames, Collection<Value> values, Tuple tuple) {
-        Iterator<String> colIt = colNames.iterator();
-        Iterator<Value> valueIt = values.iterator();
+    private void insetTupleValues(Map<String, Value> values, Tuple tuple) {
+        for (Map.Entry<String, ColumnDefinition> entry : columnDefinitions.entrySet()) {
+            String colName = entry.getKey();
+            ColumnDefinition colDef = entry.getValue();
 
-        while (colIt.hasNext()) {
-            tuple.set(colIt.next(), valueIt.next());
+            Value val = values.get(colName);
+            if (val == null) {
+                val = colDef.getDefaultValue();
+            }
+
+            if (val.isNull() && !colDef.isNullable()) {
+                throw new SqlException("Cannot insert NULL value on non-NULLABLE column '" + colName + "'");
+            }
+
+            tuple.set(colName, val);
         }
     }
 
-    public int update(List<String> colNames, List<Value> values, Predicate<Tuple> predicate) {
-        if (colNames.size() != values.size()) {
-            throw new AssertionError();
+    private static void removeFromIndices(Iterable<Index> indices, Tuple tuple) {
+        for (Index index : indices) {
+            index.remove(tuple);
+        }
+    }
+
+    private void removeFromIndices(Tuple tuple) {
+        removeFromIndices(indices.values(), tuple);
+    }
+
+    // Updates are expensive because we respect proper relational stuff
+    // - no two rows can be the same!
+    public int update(Map<String, Value> updates, Predicate<Tuple> predicate) {
+        Collection<Tuple> removed = new ArrayList<>();
+        Iterator<Tuple> it = rows.iterator();
+        while (it.hasNext()) {
+            Tuple tuple = it.next();
+            if (predicate.test(tuple)) {
+                removed.add(tuple);
+                removeFromIndices(tuple);
+                it.remove();
+            }
         }
 
-        AtomicInteger count = new AtomicInteger();
+        List<Tuple> tuplesBeforeUpdate = new ArrayList<>(removed.size());
+        List<Tuple> tuplesAfterUpdate = new ArrayList<>(removed.size());
+        try {
+            for (Tuple tuple : removed) {
+                tuplesBeforeUpdate.add(tuple.copy());
 
-        filter(predicate).forEach((tuple) -> {
-            setTupleValues(colNames, values, tuple);
-            count.incrementAndGet();
-        });
+                // now update the original tuple
+                for (Map.Entry<String, Value> entry : updates.entrySet()) {
+                    ColumnDefinition cd = columnDefinitions.get(entry.getKey());
 
-        // TODO: check if any tuples are identical now
-        return count.get();
+                    if (entry.getValue().isNull() && !cd.isNullable()) {
+                        throw new SqlException("Cannot update NULL value on non-NULLABLE column '" + entry.getKey() + "'");
+                    }
+
+                    tuple.getValues().put(entry.getKey(), entry.getValue());
+                }
+
+                addTuple(tuple);
+                tuplesAfterUpdate.add(tuple);
+            }
+        } catch (SqlException e) {
+            // rollback.
+            rows.removeAll(tuplesAfterUpdate);
+            rows.addAll(tuplesBeforeUpdate);
+
+            throw e;
+        }
+
+        return removed.size();
     }
 
     public int delete(Predicate<Tuple> predicate) {
@@ -98,7 +171,7 @@ public class Table implements Relation {
             getColumnDefinitions() :
             new AliasedMap<>(colAliases, columnDefinitions);
 
-        Stream <Tuple> rows =  filter(predicate).map((tuple) -> {
+        Stream<Tuple> rows = filter(predicate).map((tuple) -> {
             final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
 
             return new Tuple() {
@@ -113,7 +186,7 @@ public class Table implements Relation {
                     return values;
                 }
             };
-        });
+        }).distinct();
 
         //TODO: ordering
 
