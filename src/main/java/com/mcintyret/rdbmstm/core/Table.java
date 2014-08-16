@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import com.mcintyret.rdbmstm.SqlException;
-import com.mcintyret.rdbmstm.core.collect.OrderedSubsetUnmodifiableMap;
+import com.mcintyret.rdbmstm.collect.AliasedMap;
 
 public class Table implements Relation {
 
@@ -91,12 +91,15 @@ public class Table implements Relation {
         return count;
     }
 
-    public Relation select(final Collection<String> colNames, Predicate<Tuple> predicate) {
-        final Map<String, DataType> cols = colNames.isEmpty() ? getColumnDefinitions() : columnDefinitions.readOnlySubset(colNames);
-
+    public Relation select(Map<String, String> colAliases, Predicate<Tuple> predicate) {
+        final Map<String, DataType> cols = colAliases.isEmpty() ?
+            getColumnDefinitions() :
+            new AliasedMap<>(colAliases, columnDefinitions);
 
         Stream <Tuple> rows =  filter(predicate).map((tuple) -> {
-            final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
+            final Map<String, Value> values = colAliases.isEmpty() ?
+                tuple.getValues() :
+                new AliasedMap<>(colAliases, tuple.getValues());
 
             return new Tuple() {
 

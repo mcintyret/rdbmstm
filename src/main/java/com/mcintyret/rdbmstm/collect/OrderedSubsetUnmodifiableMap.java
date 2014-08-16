@@ -1,4 +1,4 @@
-package com.mcintyret.rdbmstm.core.collect;
+package com.mcintyret.rdbmstm.collect;
 
 import java.util.AbstractCollection;
 import java.util.AbstractMap;

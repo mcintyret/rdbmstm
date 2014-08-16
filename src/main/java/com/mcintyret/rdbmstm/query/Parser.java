@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -31,7 +32,7 @@ public class Parser {
     }
 
     public Query parse(String sql) throws SqlParseException {
-        Iterator<String> parts = preProcess2(sql);
+        PeekableIterator<String> parts = preProcess(sql);
         try {
             switch (parts.next()) {
                 case "create":
@@ -142,7 +143,6 @@ public class Parser {
     }
 
     private static Collection<Value> parseValues(Iterator<String> parts, Iterable<String> colNames, Relation relation) throws SqlParseException {
-        Map<String, DataType> colDefs = relation.getColumnDefinitions();
         Iterator<String> colNameIt = colNames.iterator();
 
         Collection<Value> values = parseList(parts, ")", ",", null, val -> {
@@ -196,14 +196,56 @@ public class Parser {
 
     private Query parseSelect(Iterator<String> parts) throws SqlParseException {
         try {
-            Collection<String> columnNames = toSelectList(parseList(parts, "from", ",", null, val -> val));
+            Map<String, String> colNames = new LinkedHashMap<>();
+            boolean all = false;
+            String name = null;
+            String alias = null;
+            boolean as = false;
+            while (parts.hasNext()) {
+                String part = parts.next();
+                if ("*".equals(part)) {
+                    all = true;
+                } else if ("from".equals(part) || ",".equals(part)) {
+                    if (!all && name == null) {
+                        throw new SqlParseException("Column name not specified");
+                    }
+                    if (as && alias == null) {
+                        throw new SqlParseException("No alias specified after AS for column '" + name + "'");
+                    }
+                    if (name != null) {
+                        String key = alias == null ? name : alias;
+                        if (colNames.put(key, name) != null) {
+                            throw new SqlParseException("Duplicate column name or alias: " + key);
+                        }
+                    }
+                    if ("from".equals(part)) {
+                        break;
+                    } else {
+                        name = alias = null;
+                        as = false;
+                    }
+                } else if ("as".equals(part)) {
+                    as = true;
+                } else {
+                    if (name == null) {
+                        name = part;
+                    } else {
+                        alias = part;
+                    }
+                }
+            }
+
+            if (all && !colNames.isEmpty()) {
+                throw new SqlParseException("Cannot select * as well as named columns");
+            }
+
 
             Table table = database.get(parts.next());
 
             Predicate<Tuple> predicate = parseWhere(parts, table);
 
             return database -> {
-                Relation select = table.select(columnNames, predicate);
+                Relation select = table.select(colNames, predicate);
                 System.out.println(Formatter.toString(select));
             };
         } catch (NoSuchElementException e) {
@@ -221,8 +263,8 @@ public class Parser {
 
     private static final String SPACE_CHARS = "=,()<>";
 
-    private static Iterator<String> preProcess2(final String sql) {
-        return new Iterator<String>() {
+    private static PeekableIterator<String> preProcess(final String sql) {
+        return new PeekableIterator<String>() {
 
             int i = 0;
             String next = null;
@@ -279,6 +321,14 @@ public class Parser {
                     String ret = next;
                     next = null;
                     return ret;
+                }
+                throw new NoSuchElementException();
+            }
+
+            @Override
+            public String peek() {
+                if (hasNext()) {
+                    return next;
                 }
                 throw new NoSuchElementException();
             }
@@ -449,6 +499,12 @@ public class Parser {
     static interface ParseFunction<T> {
 
         T apply(String str) throws SqlParseException;
+
+    }
+
+    interface PeekableIterator<T> extends Iterator<T> {
+
+        T peek();
 
     }
 }
