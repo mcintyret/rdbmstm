@@ -24,7 +24,7 @@ public class TableTestUtils {
             }
 
             @Override
-            public Stream<? extends Collection<Value>> getValues() {
+            public Stream<? extends Tuple> getValues() {
                 return toList(table).stream();
             }
 
@@ -35,8 +35,8 @@ public class TableTestUtils {
         };
     }
 
-    private static List<? extends Collection<Value>> toList(Object[][] table) {
-        List<Collection<Value>> list = new ArrayList<>(table.length);
+    private static List<? extends Tuple> toList(Object[][] table) {
+        List<Tuple> list = new ArrayList<>(table.length);
         for (Object[] aTable : table) {
             List<Value> row = new ArrayList<>(aTable.length);
             for (Object val : aTable) {
@@ -52,7 +52,7 @@ public class TableTestUtils {
                     throw new IllegalArgumentException("Unsupported value type: " + val.getClass());
                 }
             }
-            list.add(row);
+            list.add(new SimpleListTuple(row));
         }
         return list;
     }
@@ -61,11 +61,11 @@ public class TableTestUtils {
         // Don't care about name so much
         assertOrderedMaps(actual.getColumnDefinitions(), expected.getColumnDefinitions());
 
-        List<? extends Collection<Value>> actualValues =
-            actual.getValues().collect(Collectors.<Collection<Value>>toList());
+        List<? extends Iterable<Value>> actualValues =
+            actual.getValues().collect(Collectors.<Iterable<Value>>toList());
 
-        List<? extends Collection<Value>> expectedValues =
-            expected.getValues().collect(Collectors.<Collection<Value>>toList());
+        List<? extends Iterable<Value>> expectedValues =
+            expected.getValues().collect(Collectors.<Iterable<Value>>toList());
 
         assertIterablesEqual(actualValues, expectedValues);
     }
@@ -99,6 +99,34 @@ public class TableTestUtils {
         if (expected.hasNext()) {
             throw new AssertionError("Actual has fewer elements than expected - only " + count);
         }
+    }
 
+    private static class SimpleListTuple implements Tuple {
+
+        private final List<Value> list;
+
+        private SimpleListTuple(List<Value> list) {
+            this.list = list;
+        }
+
+        @Override
+        public Iterator<Value> iterator() {
+            return list.iterator();
+        }
+
+        @Override
+        public Map<String, ColumnDefinition> getColumnDefinitions() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Value select(String colName) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void set(String colName, Value value) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

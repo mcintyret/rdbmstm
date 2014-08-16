@@ -1,17 +1,12 @@
 package com.mcintyret.rdbmstm.core;
 
-import java.util.Collection;
-import java.util.Map;
 import java.util.stream.Stream;
 
-public interface Relation {
+public interface Relation extends Columnar {
 
     String getName();
 
-    Collection<String> getColumnNames();
+    public Stream<? extends Tuple> getValues();
 
-    public Stream<? extends Collection<Value>> getValues();
-
-    Map<String, ColumnDefinition> getColumnDefinitions();
 
 }

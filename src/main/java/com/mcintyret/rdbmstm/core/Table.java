@@ -23,7 +23,7 @@ public class Table implements Relation {
 
     private final Map<String, ColumnDefinition> columnDefinitions = new LinkedHashMap<>();
 
-    private final Set<Tuple> rows = new HashSet<>();
+    private final Set<Row> rows = new HashSet<>();
 
     private final Map<String, Index> indices = new HashMap<>();
 
@@ -42,7 +42,7 @@ public class Table implements Relation {
     public void insert(Map<String, Value> values) {
 
         final Map<String, Value> tupleValues = new HashMap<>();
-        Tuple tuple = new Tuple() {
+        Row tuple = new Row() {
             @Override
             public Map<String, ColumnDefinition> getColumnDefinitions() {
                 return columnDefinitions;
@@ -56,10 +56,10 @@ public class Table implements Relation {
 
         insetTupleValues(values, tuple);
 
-        addTuple(tuple);
+        addRow(tuple);
     }
 
-    private void addTuple(Tuple tuple) {
+    private void addRow(Row tuple) {
         // add to indices
         List<Index> addedIndices = new ArrayList<>(indices.size());
         try {
@@ -80,7 +80,7 @@ public class Table implements Relation {
         }
     }
 
-    private void insetTupleValues(Map<String, Value> values, Tuple tuple) {
+    private void insetTupleValues(Map<String, Value> values, Row tuple) {
         for (Map.Entry<String, ColumnDefinition> entry : columnDefinitions.entrySet()) {
             String colName = entry.getKey();
             ColumnDefinition colDef = entry.getValue();
@@ -90,73 +90,63 @@ public class Table implements Relation {
                 val = colDef.getDefaultValue();
             }
 
-            if (val.isNull() && !colDef.isNullable()) {
-                throw new SqlException("Cannot insert NULL value on non-NULLABLE column '" + colName + "'");
-            }
-
             tuple.set(colName, val);
         }
     }
 
-    private static void removeFromIndices(Iterable<Index> indices, Tuple tuple) {
+    private static void removeFromIndices(Iterable<Index> indices, Row tuple) {
         for (Index index : indices) {
             index.remove(tuple);
         }
     }
 
-    private void removeFromIndices(Tuple tuple) {
+    private void removeFromIndices(Row tuple) {
         removeFromIndices(indices.values(), tuple);
     }
 
     // Updates are expensive because we respect proper relational stuff
     // - no two rows can be the same!
     public int update(Map<String, Value> updates, Predicate<Tuple> predicate) {
-        Collection<Tuple> removed = new ArrayList<>();
-        Iterator<Tuple> it = rows.iterator();
+        Collection<Row> removed = new ArrayList<>();
+        Iterator<Row> it = rows.iterator();
         while (it.hasNext()) {
-            Tuple tuple = it.next();
-            if (predicate.test(tuple)) {
-                removed.add(tuple);
-                removeFromIndices(tuple);
+            Row row = it.next();
+            if (predicate.test(row)) {
+                removed.add(row);
+                removeFromIndices(row);
                 it.remove();
             }
         }
 
-        List<Tuple> tuplesBeforeUpdate = new ArrayList<>(removed.size());
-        List<Tuple> tuplesAfterUpdate = new ArrayList<>(removed.size());
+        List<Row> rowsBeforeUpdate = new ArrayList<>(removed.size());
+        List<Row> rowsAfterUpdate = new ArrayList<>(removed.size());
         try {
-            Iterator<Tuple> removedIt = removed.iterator();
+            Iterator<Row> removedIt = removed.iterator();
             while (removedIt.hasNext()) {
-                Tuple tuple = removedIt.next();
-                tuplesBeforeUpdate.add(tuple.copy());
+                Row row = removedIt.next();
+                rowsBeforeUpdate.add(row.copy());
                 removedIt.remove();
 
-                // now update the original tuple
+                // now update the original row
                 for (Map.Entry<String, Value> entry : updates.entrySet()) {
-                    ColumnDefinition cd = columnDefinitions.get(entry.getKey());
-
-                    if (entry.getValue().isNull() && !cd.isNullable()) {
-                        throw new SqlException("Cannot update NULL value on non-NULLABLE column '" + entry.getKey() + "'");
-                    }
-
-                    tuple.getValues().put(entry.getKey(), entry.getValue());
+                    row.set(entry.getKey(), entry.getValue());
                 }
 
-                addTuple(tuple);
-                tuplesAfterUpdate.add(tuple);
+                addRow(row);
+                rowsAfterUpdate.add(row);
             }
         } catch (SqlException e) {
             // rollback.
-            rows.removeAll(tuplesAfterUpdate);
-            for (Tuple tuple : tuplesAfterUpdate) {
-                removeFromIndices(tuple);
+            rows.removeAll(rowsAfterUpdate);
+            for (Row row : rowsAfterUpdate) {
+                removeFromIndices(row);
             }
 
-            for (Tuple tuple : tuplesBeforeUpdate) {
-                addTuple(tuple);
+            for (Row row : rowsBeforeUpdate) {
+                addRow(row);
             }
-            for (Tuple tuple : removed) {
-                addTuple(tuple);
+            for (Row row : removed) {
+                addRow(row);
             }
 
             throw e;
@@ -168,7 +158,7 @@ public class Table implements Relation {
     public int delete(Predicate<Tuple> predicate) {
         // Can't do this one with streams sadly
         int count = 0;
-        Iterator<Tuple> tupleIt = rows.iterator();
+        Iterator<Row> tupleIt = rows.iterator();
         while (tupleIt.hasNext()) {
             if (predicate.test(tupleIt.next())) {
                 count++;
@@ -183,10 +173,10 @@ public class Table implements Relation {
             getColumnDefinitions() :
             new AliasedMap<>(colAliases, columnDefinitions);
 
-        Stream<? extends Tuple> rows = filter(predicate).map((tuple) -> {
+        Stream<? extends Row> rows = filter(predicate).map((tuple) -> {
             final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
 
-            return new Tuple() {
+            return new Row() {
 
                 @Override
                 public Map<String, ColumnDefinition> getColumnDefinitions() {
@@ -214,7 +204,7 @@ public class Table implements Relation {
             }
 
             @Override
-            public Stream<? extends Collection<Value>> getValues() {
+            public Stream<? extends Row> getValues() {
                 return rows;
             }
 
@@ -226,7 +216,7 @@ public class Table implements Relation {
     }
 
 
-    private Stream<Tuple> filter(Predicate<Tuple> predicate) {
+    private Stream<Row> filter(Predicate<Tuple> predicate) {
         return predicate == null ? rows.stream() : rows.stream().filter(predicate);
     }
 
@@ -241,7 +231,7 @@ public class Table implements Relation {
     }
 
     @Override
-    public Stream<? extends Collection<Value>> getValues() {
+    public Stream<? extends Row> getValues() {
         return rows.stream();
     }
 
