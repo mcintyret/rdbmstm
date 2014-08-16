@@ -47,6 +47,12 @@ public class Value {
         return dataType;
     }
 
+    @Override
+    public String toString() {
+        return String.valueOf(value);
+    }
+
+
     public Object getValue() {
         return value;
     }

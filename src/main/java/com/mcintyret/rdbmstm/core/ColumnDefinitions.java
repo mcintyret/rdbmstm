@@ -1,8 +1,8 @@
 package com.mcintyret.rdbmstm.core;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 
-public class ColumnDefinitions extends HashMap<String, DataType> {
+public class ColumnDefinitions extends LinkedHashMap<String, DataType> {
 
     public ColumnDefinitions readOnlySubset(Iterable<String> toKeep) {
         ColumnDefinitions subset = new ColumnDefinitions();

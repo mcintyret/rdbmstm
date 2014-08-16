@@ -1,8 +1,10 @@
 package com.mcintyret.rdbmstm.core;
 
+import java.util.AbstractCollection;
+import java.util.Iterator;
 import java.util.Map;
 
-public abstract class Tuple {
+public abstract class Tuple extends AbstractCollection<Value> {
 
     public Value select(String columnName) {
         checkColumnName(columnName);
@@ -27,7 +29,7 @@ public abstract class Tuple {
     }
 
 
-    public abstract ColumnDefinitions getColumnDefinitions();
+    public abstract Map<String, DataType> getColumnDefinitions();
 
     public abstract Map<String, Value> getValues();
 
@@ -45,5 +47,15 @@ public abstract class Tuple {
     @Override
     public int hashCode() {
         return getValues().hashCode();
+    }
+
+    @Override
+    public int size() {
+        return getValues().size();
+    }
+
+    @Override
+    public Iterator<Value> iterator() {
+        return getValues().values().iterator();
     }
 }

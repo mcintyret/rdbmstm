@@ -1,6 +1,7 @@
 package com.mcintyret.rdbmstm.core;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -12,9 +13,8 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import com.mcintyret.rdbmstm.core.collect.OrderedSubsetUnmodifiableMap;
-import com.sun.javafx.collections.UnmodifiableObservableMap;
 
-public class Table {
+public class Table implements Relation {
 
     private final String name;
 
@@ -27,7 +27,7 @@ public class Table {
         this.columnDefinitions.putAll(columnDefinitions);
     }
 
-    public void insert(List<String> colNames, List<Value> values) {
+    public void insert(Collection<String> colNames, Collection<Value> values) {
         if (colNames.size() != values.size()) {
             throw new AssertionError();
         }
@@ -53,7 +53,7 @@ public class Table {
         }
     }
 
-    private void setTupleValues(List<String> colNames, List<Value> values, Tuple tuple) {
+    private void setTupleValues(Collection<String> colNames, Collection<Value> values, Tuple tuple) {
         Iterator<String> colIt = colNames.iterator();
         Iterator<Value> valueIt = values.iterator();
 
@@ -92,7 +92,7 @@ public class Table {
     }
 
     public Stream<Tuple> select(final List<String> colNames, Predicate<Tuple> predicate) {
-        final ColumnDefinitions cols = columnDefinitions.readOnlySubset(colNames);
+        final Map<String, DataType> cols = colNames.isEmpty() ? getColumnDefinitions() : columnDefinitions.readOnlySubset(colNames);
 
         return filter(predicate).map((tuple) -> {
             final Map<String, Value> values = colNames.isEmpty() ?
@@ -102,7 +102,7 @@ public class Table {
             return new Tuple() {
 
                 @Override
-                public ColumnDefinitions getColumnDefinitions() {
+                public Map<String, DataType> getColumnDefinitions() {
                     return cols;
                 }
 
@@ -121,7 +121,23 @@ public class Table {
         return predicate == null ? rows.stream() : rows.stream().filter(predicate);
     }
 
+    @Override
     public String getName() {
         return name;
+    }
+
+    @Override
+    public Collection<String> getColumnNames() {
+        return columnDefinitions.keySet();
+    }
+
+    @Override
+    public Collection<? extends Collection<Value>> getValues() {
+        return Collections.unmodifiableSet(rows);
+    }
+
+    @Override
+    public Map<String, DataType> getColumnDefinitions() {
+        return Collections.unmodifiableMap(columnDefinitions);
     }
 }
