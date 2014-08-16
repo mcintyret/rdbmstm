@@ -31,7 +31,7 @@ public class Parser {
     }
 
     public Query parse(String sql) throws SqlParseException {
-        Iterator<String> parts = Arrays.asList(preProcess(sql).split("\\s+")).iterator();
+        Iterator<String> parts = preProcess2(sql);
         try {
             switch (parts.next()) {
                 case "create":
@@ -219,15 +219,70 @@ public class Parser {
         return in;
     }
 
+    private static final String SPACE_CHARS = "=,()<>";
 
-    private static String preProcess(String sql) {
-        sql = sql.toLowerCase();
-        return sql.replaceAll("=", " = ")
-            .replaceAll("\\(", " ( ")
-            .replaceAll("\\)", " ) ")
-            .replaceAll("<", " < ")
-            .replaceAll(">", " > ")
-            .replaceAll(",", " , ");
+    private static Iterator<String> preProcess2(final String sql) {
+        return new Iterator<String>() {
+
+            int i = 0;
+            String next = null;
+
+            @Override
+            public boolean hasNext() {
+                if (next == null) {
+                    next = findNext();
+                }
+                return next != null;
+            }
+
+            private String findNext() {
+                StringBuilder sb = null;
+                boolean inQuotes = false;
+                while (i < sql.length()) {
+                    char c = sql.charAt(i++);
+                    if (!inQuotes) {
+
+                        if (Character.isWhitespace(c)) {
+                            if (sb != null) {
+                                return sb.toString();
+                            }
+                            continue;
+                        }
+                        if (SPACE_CHARS.indexOf(c) >= 0) {
+                            if (sb != null) {
+                                i--; // we want to see this again!
+                                return sb.toString();
+                            }
+                            return String.valueOf(c);
+                        }
+
+                        if (sb == null) {
+                            sb = new StringBuilder();
+                        }
+                    }
+                    sb.append(c);
+
+                    if (c == '\'') {
+                        inQuotes = !inQuotes;
+                    }
+                }
+                if (sb != null) {
+                    return sb.toString();
+                }
+
+                return null;
+            }
+
+            @Override
+            public String next() {
+                if (hasNext()) {
+                    String ret = next;
+                    next = null;
+                    return ret;
+                }
+                throw new NoSuchElementException();
+            }
+        };
     }
 
 
