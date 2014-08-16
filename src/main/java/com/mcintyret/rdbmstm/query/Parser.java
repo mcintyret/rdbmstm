@@ -381,6 +381,7 @@ public class Parser {
                 pps.add(pp);
             } else {
                 val = part;
+                break;
             }
         }
 

@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 
 import com.mcintyret.rdbmstm.SqlException;
 import com.mcintyret.rdbmstm.collect.AliasedMap;
+import com.mcintyret.rdbmstm.collect.OrderedSubsetUnmodifiableMap;
 
 public class Table implements Relation {
 
@@ -97,9 +98,7 @@ public class Table implements Relation {
             new AliasedMap<>(colAliases, columnDefinitions);
 
         Stream <Tuple> rows =  filter(predicate).map((tuple) -> {
-            final Map<String, Value> values = colAliases.isEmpty() ?
-                tuple.getValues() :
-                new AliasedMap<>(colAliases, tuple.getValues());
+            final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
 
             return new Tuple() {
 
