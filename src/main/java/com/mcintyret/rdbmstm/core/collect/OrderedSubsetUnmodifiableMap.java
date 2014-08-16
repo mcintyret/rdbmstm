@@ -19,11 +19,19 @@ public class OrderedSubsetUnmodifiableMap<K, V> implements Map<K, V> {
 
     public OrderedSubsetUnmodifiableMap(Map<K, V> map, Iterable<K> keys) {
         this.map = map;
-        Set<K> tempKeys = new LinkedHashSet<>();
-        for (K key : keys) {
-            tempKeys.add(key);
+        this.keys = Collections.unmodifiableSet(makeKeys(keys));
+    }
+
+    private static <K> Set<K> makeKeys(Iterable<K> keys) {
+        if (keys instanceof Set) {
+            return (Set<K>) keys;
+        } else {
+            Set<K> tempKeys = new LinkedHashSet<>();
+            for (K key : keys) {
+                tempKeys.add(key);
+            }
+            return tempKeys;
         }
-        this.keys = Collections.unmodifiableSet(tempKeys);
     }
 
 

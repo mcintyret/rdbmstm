@@ -94,10 +94,9 @@ public class Table implements Relation {
     public Relation select(final Collection<String> colNames, Predicate<Tuple> predicate) {
         final Map<String, DataType> cols = colNames.isEmpty() ? getColumnDefinitions() : columnDefinitions.readOnlySubset(colNames);
 
-        Stream<Tuple> rows =  filter(predicate).map((tuple) -> {
-            final Map<String, Value> values = colNames.isEmpty() ?
-                tuple.getValues() :
-                new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), colNames);
+
+        Stream <Tuple> rows =  filter(predicate).map((tuple) -> {
+            final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
 
             return new Tuple() {
 

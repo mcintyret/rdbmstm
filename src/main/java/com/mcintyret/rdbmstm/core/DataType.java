@@ -5,5 +5,9 @@ public enum DataType {
     FLOAT,
     STRING,
     DATETIME,
-    BOOLEAN
+    BOOLEAN;
+
+    public boolean isNumeric() {
+        return this == INTEGER || this == FLOAT;
+    }
 }

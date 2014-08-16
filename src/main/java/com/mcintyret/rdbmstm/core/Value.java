@@ -11,16 +11,20 @@ public class Value {
         this.value = value;
     }
 
-    public static Value of(final String string) {
+    public static Value of(String string) {
         return new Value(DataType.STRING, string);
     }
 
-    public static Value of(final long l) {
+    public static Value of(long l) {
         return new Value(DataType.INTEGER, l);
     }
 
-    public static Value of(final double d) {
+    public static Value of(double d) {
         return new Value(DataType.FLOAT, d);
+    }
+
+    public static Value nullOf(DataType dataType) {
+        return new Value(dataType, null);
     }
 
     @Override
@@ -30,10 +34,9 @@ public class Value {
 
         Value value1 = (Value) o;
 
-        if (dataType != value1.dataType) return false;
-        if (value != null ? !value.equals(value1.value) : value1.value != null) return false;
+        return dataType == value1.dataType &&
+            !(value != null ? !value.equals(value1.value) : value1.value != null);
 
-        return true;
     }
 
     @Override

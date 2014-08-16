@@ -3,6 +3,8 @@ package com.mcintyret.rdbmstm.query;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,9 @@ import com.mcintyret.rdbmstm.core.Relation;
 import com.mcintyret.rdbmstm.core.Table;
 import com.mcintyret.rdbmstm.core.Tuple;
 import com.mcintyret.rdbmstm.core.Value;
+import com.mcintyret.rdbmstm.core.predicate.ColumnEquals;
+import com.mcintyret.rdbmstm.core.predicate.ColumnGreaterThan;
+import com.mcintyret.rdbmstm.core.predicate.ColumnLessThan;
 
 public class Parser {
 
@@ -88,7 +93,7 @@ public class Parser {
             throw new SqlParseException("Different number of column names and new values");
         }
 
-        Predicate<Tuple> predicate = parseWhere(parts);
+        Predicate<Tuple> predicate = parseWhere(parts, table);
 
         return database -> {
             table.update(colNames, values, predicate);
@@ -166,6 +171,9 @@ public class Parser {
     }
 
     private static Value parseValue(String val, DataType dataType) throws SqlParseException {
+        if ("null".equals(val)) {
+            return Value.nullOf(dataType);
+        }
         try {
             switch (dataType) {
                 case STRING:
@@ -190,12 +198,12 @@ public class Parser {
         try {
             Collection<String> columnNames = toSelectList(parseList(parts, "from", ",", null, val -> val));
 
-            String tableName = parts.next();
+            Table table = database.get(parts.next());
 
-            Predicate<Tuple> predicate = parseWhere(parts);
+            Predicate<Tuple> predicate = parseWhere(parts, table);
 
             return database -> {
-                Relation select = database.get(tableName).select(columnNames, predicate);
+                Relation select = table.select(columnNames, predicate);
                 System.out.println(Formatter.toString(select));
             };
         } catch (NoSuchElementException e) {
@@ -217,20 +225,158 @@ public class Parser {
         return sql.replaceAll("=", " = ")
             .replaceAll("\\(", " ( ")
             .replaceAll("\\)", " ) ")
+            .replaceAll("<", " < ")
+            .replaceAll(">", " > ")
             .replaceAll(",", " , ");
     }
 
 
-    private Predicate<Tuple> parseWhere(Iterator<String> parts) throws SqlParseException {
+    private Predicate<Tuple> parseWhere(Iterator<String> parts, Relation relation) throws SqlParseException {
         if (parts.hasNext()) {
             assertNextToken("where", parts);
 
-            while (parts.hasNext()) {
-                // TODO: implement
-                break;
+            try {
+                return parsePredicate(parts, relation);
+            } catch (NoSuchElementException e) {
+                throw new SqlParseException("WHERE clause incomplete or not formatted propertly");
             }
+
         }
         return null;
+    }
+
+    private Predicate<Tuple> parsePredicate(Iterator<String> parts, Relation relation) throws SqlParseException {
+        String part = parts.next();
+
+        if ("not".equals(part)) {
+            return parsePredicate(parts, relation).negate();
+        }
+
+        if ("(".equals(part)) {
+            Predicate<Tuple> left = parsePredicate(parts, relation);
+
+            boolean and = parseAndOr(parts);
+
+            Predicate<Tuple> right = parsePredicate(parts, relation);
+
+            assertNextToken(")", parts); // consume closing parenthesis
+
+            return and ? left.and(right) : left.or(right);
+        }
+
+        // Simple column predicates for now
+        String colName = part;
+
+        List<PredicatePart> pps = new ArrayList<>();
+        String val = null;
+        while (parts.hasNext()) {
+            part = parts.next();
+            PredicatePart pp = PredicatePart.PARTS.get(part);
+            if (pp != null) {
+                pps.add(pp);
+            } else {
+                val = part;
+            }
+        }
+
+        PredicateType type = PredicateType.PARTS_MAP.get(pps);
+        if (type == null) {
+            throw new SqlParseException("Unknown predicate in WHERE clause");
+        }
+        return type.makePredicate(colName, parseValue(val, colName, relation));
+    }
+
+    // TODO handle IS and IS NOT
+    enum PredicatePart {
+        EQ("="),
+        LT("<"),
+        GT(">");
+
+        final String val;
+
+        PredicatePart(String val) {
+            this.val = val;
+        }
+
+        static final Map<String, PredicatePart> PARTS = makeParts();
+
+        private static Map<String, PredicatePart> makeParts() {
+            Map<String, PredicatePart> parts = new HashMap<>();
+            for (PredicatePart predicateParts : values()) {
+                parts.put(predicateParts.val, predicateParts);
+            }
+            return Collections.unmodifiableMap(parts);
+        }
+    }
+
+    enum PredicateType {
+        EQ(PredicatePart.EQ) {
+            @Override
+            Predicate<Tuple> makePredicate(String colName, Value val) {
+                return new ColumnEquals(colName, val);
+            }
+        },
+        NE(PredicatePart.LT, PredicatePart.GT) {
+            @Override
+            Predicate<Tuple> makePredicate(String colName, Value val) {
+                return EQ.makePredicate(colName, val).negate();
+            }
+        },
+        GT(PredicatePart.GT) {
+            @Override
+            Predicate<Tuple> makePredicate(String colName, Value val) {
+                return new ColumnGreaterThan(colName, val);
+            }
+        },
+        GTE(PredicatePart.GT, PredicatePart.EQ) {
+            @Override
+            Predicate<Tuple> makePredicate(String colName, Value val) {
+                return LT.makePredicate(colName, val).negate();
+            }
+        },
+        LT(PredicatePart.LT) {
+            @Override
+            Predicate<Tuple> makePredicate(String colName, Value val) {
+                return new ColumnLessThan(colName, val);
+            }
+        },
+        LTE(PredicatePart.LT, PredicatePart.EQ) {
+            @Override
+            Predicate<Tuple> makePredicate(String colName, Value val) {
+                return GT.makePredicate(colName, val).negate();
+            }
+        };
+
+        private final List<PredicatePart> parts;
+
+        PredicateType(PredicatePart... parts) {
+            this.parts = Arrays.asList(parts);
+        }
+
+        abstract Predicate<Tuple> makePredicate(String colName, Value val);
+
+        static final Map<List<PredicatePart>, PredicateType> PARTS_MAP = makePartsMap();
+
+        private static Map<List<PredicatePart>, PredicateType> makePartsMap() {
+            Map<List<PredicatePart>, PredicateType> map = new HashMap<>();
+            for (PredicateType pt : values()) {
+                map.put(pt.parts, pt);
+            }
+            return Collections.unmodifiableMap(map);
+        }
+
+    }
+
+    private boolean parseAndOr(Iterator<String> parts) throws SqlParseException {
+        String part = parts.next();
+        switch (part) {
+            case "and":
+                return true;
+            case "or":
+                return false;
+            default:
+                throw new SqlParseException("Expected AND or OR but got '" + part);
+        }
     }
 
     private static void assertNextToken(String expected, Iterator<String> parts) throws SqlParseException {
