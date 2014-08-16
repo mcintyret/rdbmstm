@@ -1,6 +1,6 @@
 package com.mcintyret.rdbmstm;
 
-public class SqlException extends Exception {
+public class SqlException extends RuntimeException {
 
     public SqlException(String message) {
         super(message);

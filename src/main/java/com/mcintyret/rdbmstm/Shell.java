@@ -19,7 +19,6 @@ public class Shell {
         dataTypes.put("bar", DataType.INTEGER);
         dataTypes.put("baz", DataType.STRING);
 
-
         Table table = new Table("table_1", dataTypes);
 
         database.add(table);

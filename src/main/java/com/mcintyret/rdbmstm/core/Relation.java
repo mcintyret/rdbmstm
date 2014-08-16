@@ -2,6 +2,7 @@ package com.mcintyret.rdbmstm.core;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public interface Relation {
 
@@ -9,7 +10,7 @@ public interface Relation {
 
     Collection<String> getColumnNames();
 
-    public Collection<? extends Collection<Value>> getValues();
+    public Stream<? extends Collection<Value>> getValues();
 
     Map<String, DataType> getColumnDefinitions();
 

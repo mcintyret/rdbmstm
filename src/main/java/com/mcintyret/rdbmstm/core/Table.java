@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import com.mcintyret.rdbmstm.SqlException;
 import com.mcintyret.rdbmstm.core.collect.OrderedSubsetUnmodifiableMap;
 
 public class Table implements Relation {
@@ -48,8 +49,7 @@ public class Table implements Relation {
         setTupleValues(colNames, values, tuple);
 
         if (!rows.add(tuple)) {
-            throw new IllegalArgumentException("Values " + values + " cannot be inserted into columns " + colNames +
-                ": duplicate row");
+            throw new SqlException("Values " + values + " cannot be inserted into columns " + colNames + ": duplicate row");
         }
     }
 
@@ -91,10 +91,10 @@ public class Table implements Relation {
         return count;
     }
 
-    public Stream<Tuple> select(final List<String> colNames, Predicate<Tuple> predicate) {
+    public Relation select(final Collection<String> colNames, Predicate<Tuple> predicate) {
         final Map<String, DataType> cols = colNames.isEmpty() ? getColumnDefinitions() : columnDefinitions.readOnlySubset(colNames);
 
-        return filter(predicate).map((tuple) -> {
+        Stream<Tuple> rows =  filter(predicate).map((tuple) -> {
             final Map<String, Value> values = colNames.isEmpty() ?
                 tuple.getValues() :
                 new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), colNames);
@@ -114,6 +114,28 @@ public class Table implements Relation {
         });
 
         //TODO: ordering
+
+        return new Relation() {
+            @Override
+            public String getName() {
+                return "Selection";
+            }
+
+            @Override
+            public Collection<String> getColumnNames() {
+                return cols.keySet();
+            }
+
+            @Override
+            public Stream<? extends Collection<Value>> getValues() {
+                return rows;
+            }
+
+            @Override
+            public Map<String, DataType> getColumnDefinitions() {
+                return cols;
+            }
+        };
     }
 
 
@@ -132,8 +154,8 @@ public class Table implements Relation {
     }
 
     @Override
-    public Collection<? extends Collection<Value>> getValues() {
-        return Collections.unmodifiableSet(rows);
+    public Stream<? extends Collection<Value>> getValues() {
+        return rows.stream();
     }
 
     @Override

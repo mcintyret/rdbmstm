@@ -4,25 +4,27 @@ import java.util.AbstractCollection;
 import java.util.Iterator;
 import java.util.Map;
 
+import com.mcintyret.rdbmstm.SqlException;
+
 public abstract class Tuple extends AbstractCollection<Value> {
 
-    public Value select(String columnName) {
+    public Value select(String columnName) throws SqlException {
         checkColumnName(columnName);
         return getValues().get(columnName);
     }
 
-    private void checkColumnName(String columnName) {
+    private void checkColumnName(String columnName) throws SqlException {
         if (!getColumnDefinitions().containsKey(columnName)) {
-            throw new IllegalArgumentException("No such column: " + columnName);
+            throw new SqlException("No such column: " + columnName);
         }
     }
 
-    public void set(String columnName, Value value) {
+    public void set(String columnName, Value value) throws SqlException {
         DataType colType = getColumnDefinitions().get(columnName);
         if (colType == null) {
-            throw new IllegalArgumentException("No such column: " + columnName);
+            throw new SqlException("No such column: " + columnName);
         } else if (colType != value.getDataType()) {
-            throw new IllegalArgumentException("Value of type " + value.getDataType() + " cannot be placed in column '"
+            throw new SqlException("Value of type " + value.getDataType() + " cannot be placed in column '"
             + columnName + "' of type " + colType);
         }
         getValues().put(columnName, value);
