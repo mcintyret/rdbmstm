@@ -39,4 +39,26 @@ public class ColumnDefinition {
     public boolean isUnique() {
         return unique;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ColumnDefinition that = (ColumnDefinition) o;
+
+        if (nullable != that.nullable) return false;
+        if (unique != that.unique) return false;
+        if (dataType != that.dataType) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = dataType.hashCode();
+        result = 31 * result + (nullable ? 1 : 0);
+        result = 31 * result + (unique ? 1 : 0);
+        return result;
+    }
 }
