@@ -114,6 +114,7 @@ public class Parser {
 
         return database -> {
             table.insert(cols, values);
+            System.out.println("Successfully inserted row");
         };
 
     }
@@ -254,13 +255,6 @@ public class Parser {
 
     }
 
-    private static Collection<String> toSelectList(Collection<String> in) {
-        if (in.size() == 1 && "*".equals(in.iterator().next())) {
-            in.clear();
-        }
-        return in;
-    }
-
     private static final String SPACE_CHARS = "=,()<>";
 
     private static PeekableIterator<String> preProcess(final String sql) {
@@ -282,6 +276,14 @@ public class Parser {
                 boolean inQuotes = false;
                 while (i < sql.length()) {
                     char c = sql.charAt(i++);
+                    if (i == sql.length()) {
+                        if (c == ';') {
+                            return sb == null ? null : sb.toString();
+                        } else {
+                            throw new SqlParseException("SQL did not end with ';'");
+                        }
+                    }
+
                     if (!inQuotes) {
 
                         if (Character.isWhitespace(c)) {
@@ -350,6 +352,7 @@ public class Parser {
         return null;
     }
 
+    // TODO: support AND and OR without brackets
     private Predicate<Tuple> parsePredicate(Iterator<String> parts, Relation relation) throws SqlParseException {
         String part = parts.next();
 

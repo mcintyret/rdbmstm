@@ -29,11 +29,14 @@ public class Shell {
 
 
         while (true) {
-            System.out.println(">");
-            String query = scanner.nextLine();
+            StringBuilder sb = new StringBuilder();
+            do {
+                System.out.print("> ");
+                sb.append(scanner.nextLine());
+            } while (sb.length() == 0 || sb.charAt(sb.length() - 1) != ';');
 
             try {
-                parser.parse(query).execute(database);
+                parser.parse(sb.toString()).execute(database);
             } catch (SqlException e) {
                 e.printStackTrace();
             }
