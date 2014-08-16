@@ -12,6 +12,6 @@ public interface Relation {
 
     public Stream<? extends Collection<Value>> getValues();
 
-    Map<String, DataType> getColumnDefinitions();
+    Map<String, ColumnDefinition> getColumnDefinitions();
 
 }

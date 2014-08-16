@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,11 +21,11 @@ public class Table implements Relation {
 
     private final String name;
 
-    private final ColumnDefinitions columnDefinitions = new ColumnDefinitions();
+    private final Map<String, ColumnDefinition> columnDefinitions = new LinkedHashMap<>();
 
     private final Set<Tuple> rows = new HashSet<>();
 
-    public Table(String name, Map<String, DataType> columnDefinitions) {
+    public Table(String name, Map<String, ColumnDefinition> columnDefinitions) {
         this.name = name;
         this.columnDefinitions.putAll(columnDefinitions);
     }
@@ -37,7 +38,7 @@ public class Table implements Relation {
         final Map<String, Value> tupleValues = new HashMap<>();
         Tuple tuple = new Tuple() {
             @Override
-            public ColumnDefinitions getColumnDefinitions() {
+            public Map<String, ColumnDefinition> getColumnDefinitions() {
                 return columnDefinitions;
             }
 
@@ -93,7 +94,7 @@ public class Table implements Relation {
     }
 
     public Relation select(Map<String, String> colAliases, Predicate<Tuple> predicate) {
-        final Map<String, DataType> cols = colAliases.isEmpty() ?
+        final Map<String, ColumnDefinition> cols = colAliases.isEmpty() ?
             getColumnDefinitions() :
             new AliasedMap<>(colAliases, columnDefinitions);
 
@@ -103,7 +104,7 @@ public class Table implements Relation {
             return new Tuple() {
 
                 @Override
-                public Map<String, DataType> getColumnDefinitions() {
+                public Map<String, ColumnDefinition> getColumnDefinitions() {
                     return cols;
                 }
 
@@ -133,7 +134,7 @@ public class Table implements Relation {
             }
 
             @Override
-            public Map<String, DataType> getColumnDefinitions() {
+            public Map<String, ColumnDefinition> getColumnDefinitions() {
                 return cols;
             }
         };
@@ -160,7 +161,7 @@ public class Table implements Relation {
     }
 
     @Override
-    public Map<String, DataType> getColumnDefinitions() {
+    public Map<String, ColumnDefinition> getColumnDefinitions() {
         return Collections.unmodifiableMap(columnDefinitions);
     }
 }

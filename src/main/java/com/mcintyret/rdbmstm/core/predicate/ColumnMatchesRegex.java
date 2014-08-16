@@ -15,7 +15,7 @@ public class ColumnMatchesRegex extends ColumnPredicate {
 
     @Override
     public boolean test(Tuple tuple) {
-        if (tuple.getColumnDefinitions().get(columnName) != DataType.STRING) {
+        if (tuple.getColumnDefinitions().get(columnName).getDataType() != DataType.STRING) {
             throw new SqlException("Regex predicate only valid for values of type String");
         }
         return tuple.select(columnName).toString().matches(regex);

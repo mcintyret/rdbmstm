@@ -20,7 +20,7 @@ public abstract class Tuple extends AbstractCollection<Value> {
     }
 
     public void set(String columnName, Value value) throws SqlException {
-        DataType colType = getColumnDefinitions().get(columnName);
+        DataType colType = getColumnDefinitions().get(columnName).getDataType();
         if (colType == null) {
             throw new SqlException("No such column: " + columnName);
         } else if (colType != value.getDataType()) {
@@ -31,7 +31,7 @@ public abstract class Tuple extends AbstractCollection<Value> {
     }
 
 
-    public abstract Map<String, DataType> getColumnDefinitions();
+    public abstract Map<String, ColumnDefinition> getColumnDefinitions();
 
     public abstract Map<String, Value> getValues();
 

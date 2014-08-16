@@ -17,7 +17,7 @@ abstract class NumericColumnPredicate extends ColumnPredicate {
 
     @Override
     public boolean test(Tuple tuple) {
-        checkDataType(tuple.getColumnDefinitions().get(columnName));
+        checkDataType(tuple.getColumnDefinitions().get(columnName).getDataType());
         return doTest(((Number) tuple.getValues().get(columnName).getValue()).doubleValue(), test);
     }
 

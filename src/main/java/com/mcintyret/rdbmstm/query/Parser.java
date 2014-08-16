@@ -13,6 +13,7 @@ import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
 import com.mcintyret.rdbmstm.Formatter;
+import com.mcintyret.rdbmstm.core.ColumnDefinition;
 import com.mcintyret.rdbmstm.core.DataType;
 import com.mcintyret.rdbmstm.core.Database;
 import com.mcintyret.rdbmstm.core.Relation;
@@ -174,12 +175,12 @@ public class Parser {
     }
 
     private static Value parseValue(String val, String colName, Relation relation) throws SqlParseException {
-        DataType dataType = relation.getColumnDefinitions().get(colName);
-        if (dataType == null) {
+        ColumnDefinition cd = relation.getColumnDefinitions().get(colName);
+        if (cd == null) {
             throw new SqlParseException("No column '" + colName + "' exists on table '" + relation.getName() + "'");
         }
 
-        return parseValue(val, dataType);
+        return parseValue(val, cd.getDataType());
     }
 
     private static Value parseValue(String val, DataType dataType) throws SqlParseException {
