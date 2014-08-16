@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -209,7 +210,7 @@ public class Parser {
 
     }
 
-    private Query parseSelect(Iterator<String> parts) throws SqlParseException {
+    private Query parseSelect(PeekableIterator<String> parts) throws SqlParseException {
         try {
             Map<String, String> colNames = new LinkedHashMap<>();
             boolean all = false;
@@ -259,14 +260,41 @@ public class Parser {
 
             Predicate<Tuple> predicate = parseWhere(parts, table);
 
+            Comparator<Tuple> comp = parseOrderBy(parts);
+
             return database -> {
-                Relation select = table.select(colNames, predicate);
+                Relation select = table.select(colNames, predicate, comp);
                 System.out.println(Formatter.toString(select));
             };
         } catch (NoSuchElementException e) {
             throw new SqlParseException("Incomplete sql SELECT statement");
         }
 
+    }
+
+    private Comparator<Tuple> parseOrderBy(PeekableIterator<String> parts) {
+        if (consumeIfPresent("order", parts)) {
+            assertNextToken("by", parts);
+            Comparator<Tuple> comp = columnComparator(parts.next());
+
+            if (parts.hasNext()) {
+                String dir = parts.next();
+                switch (dir) {
+                    case "asc":
+                    case "ascending":
+                        break;
+                    case "desc":
+                    case "descending":
+                        comp = comp.reversed();
+                        break;
+                    default:
+                        throw new SqlParseException("Illegal modifier for ORDER BY: " + dir);
+
+                }
+            }
+            return comp;
+        }
+        return null;
     }
 
     private static final String SPACE_CHARS = "=,()<>";
@@ -352,9 +380,8 @@ public class Parser {
     }
 
 
-    private Predicate<Tuple> parseWhere(Iterator<String> parts, Relation relation) throws SqlParseException {
-        if (parts.hasNext()) {
-            assertNextToken("where", parts);
+    private Predicate<Tuple> parseWhere(PeekableIterator<String> parts, Relation relation) throws SqlParseException {
+        if (consumeIfPresent("where", parts)) {
 
             return parsePredicate(parts, relation);
         }
@@ -507,6 +534,14 @@ public class Parser {
         }
     }
 
+    private static boolean consumeIfPresent(String test, PeekableIterator<String> parts) {
+        if (parts.hasNext() && test.equals(parts.peek())) {
+            parts.next();
+            return true;
+        }
+        return false;
+    }
+
 
     @FunctionalInterface
     static interface ParseFunction<T> {
@@ -519,5 +554,9 @@ public class Parser {
 
         T peek();
 
+    }
+
+    private static Comparator<Tuple> columnComparator(final String columnName) {
+        return (left, right) -> left.select(columnName).compareTo(right.select(columnName));
     }
 }

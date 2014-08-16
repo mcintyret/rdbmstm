@@ -3,6 +3,7 @@ package com.mcintyret.rdbmstm.core;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -168,7 +169,7 @@ public class Table implements Relation {
         return count;
     }
 
-    public Relation select(Map<String, String> colAliases, Predicate<Tuple> predicate) {
+    public Relation select(Map<String, String> colAliases, Predicate<Tuple> predicate, Comparator<Tuple> comp) {
         final Map<String, ColumnDefinition> cols = colAliases.isEmpty() ?
             getColumnDefinitions() :
             new AliasedMap<>(colAliases, columnDefinitions);
@@ -190,7 +191,7 @@ public class Table implements Relation {
             };
         }).distinct();
 
-        //TODO: ordering
+        final Stream<? extends Tuple> sortedRows = comp == null ? rows : rows.sorted(comp);
 
         return new Relation() {
             @Override
@@ -204,8 +205,8 @@ public class Table implements Relation {
             }
 
             @Override
-            public Stream<? extends Row> getValues() {
-                return rows;
+            public Stream<? extends Tuple> getValues() {
+                return sortedRows;
             }
 
             @Override

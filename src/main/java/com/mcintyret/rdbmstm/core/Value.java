@@ -4,11 +4,11 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 
-public class Value {
+public class Value implements Comparable<Value> {
 
     private final DataType dataType;
 
-    private final Object value;
+    private final Comparable value;
 
     private static final Map<DataType, Value> NULL_VALUE_CACHE = makeNullValues();
 
@@ -20,7 +20,7 @@ public class Value {
         return Collections.unmodifiableMap(map);
     }
 
-    private Value(DataType dataType, Object value) {
+    private Value(DataType dataType, Comparable value) {
         this.dataType = dataType;
         this.value = value;
     }
@@ -74,7 +74,12 @@ public class Value {
     }
 
 
-    public Object getValue() {
+    public Comparable getValue() {
         return value;
+    }
+
+    @Override
+    public int compareTo(Value o) {
+        return value.compareTo(o.value);
     }
 }

@@ -1,13 +1,10 @@
 • Multi-table stuff
-• Aliases
-• Indexes
-• Constraints
+• Constraints (other than unique)
 • Joins
 • Admin stuff (do I really care?)
-• Ordering
 • Functions
 • More Datatypes
-• Multiline input on console
 • Dropping
+• Creating
 
 • Transactions!!?!??!?!?!?!!!?
