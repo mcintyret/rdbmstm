@@ -8,6 +8,8 @@ import com.mcintyret.rdbmstm.core.ColumnDefinition;
 import com.mcintyret.rdbmstm.core.DataType;
 import com.mcintyret.rdbmstm.core.Database;
 import com.mcintyret.rdbmstm.core.Table;
+import com.mcintyret.rdbmstm.query.Execution;
+import com.mcintyret.rdbmstm.query.Modification;
 import com.mcintyret.rdbmstm.query.Parser;
 
 public class Shell {
@@ -37,7 +39,14 @@ public class Shell {
             } while (sb.length() == 0 || sb.charAt(sb.length() - 1) != ';');
 
             try {
-                parser.parse(sb.toString()).execute(database);
+                Execution ex = parser.parse(sb.toString());
+                if (ex.isQuery()) {
+                    System.out.println(Formatter.toString(ex.executeQuery()));
+                } else {
+                    Modification mod = ex.executeModification();
+                    System.out.println("Successfully executed " + mod.getType() + " on " + mod.getNum() + " rows");
+                }
+
             } catch (SqlException e) {
                 e.printStackTrace();
             }

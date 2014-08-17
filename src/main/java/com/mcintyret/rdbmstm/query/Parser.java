@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
-import com.mcintyret.rdbmstm.Formatter;
 import com.mcintyret.rdbmstm.collect.PeekableIterator;
 import com.mcintyret.rdbmstm.core.ColumnDefinition;
 import com.mcintyret.rdbmstm.core.DataType;
@@ -40,7 +39,7 @@ public class Parser {
         this.database = database;
     }
 
-    public Query parse(String sql) throws SqlParseException {
+    public Execution parse(String sql) throws SqlParseException {
         PeekableIterator<String> parts = preProcess(sql);
         try {
             switch (parts.next()) {
@@ -67,17 +66,17 @@ public class Parser {
         throw new SqlParseException("Not handled yet: " + sql);
     }
 
-    private Query parseDelete(PeekableIterator<String> parts) {
+    private Execution parseDelete(PeekableIterator<String> parts) {
         assertNextToken("from", parts);
 
         Table table = database.get(parts.next());
 
         Predicate<Tuple> predicate = parseWhere(parts, table);
 
-        return database -> System.out.println(table.delete(predicate) + " rows deleted");
+        return Execution.forModification(() -> Modification.delete(table.delete(predicate)));
     }
 
-    private Query parseUpdate(Iterator<String> parts) throws SqlParseException {
+    private Execution parseUpdate(Iterator<String> parts) throws SqlParseException {
         String tableName = parts.next();
         Table table = database.get(tableName);
 
@@ -116,12 +115,10 @@ public class Parser {
 
         Predicate<Tuple> predicate = parsePredicate(parts, table);
 
-        return database -> {
-            System.out.println(table.update(values, predicate) + " rows updated");
-        };
+        return Execution.forModification(() -> { return Modification.update(table.update(values, predicate)); });
     }
 
-    private Query parseInsert(Iterator<String> parts) throws SqlParseException {
+    private Execution parseInsert(Iterator<String> parts) throws SqlParseException {
         assertNextToken("into", parts);
 
         String tableName = parts.next();
@@ -132,10 +129,10 @@ public class Parser {
         assertNextToken("(", parts);
         Collection<Value> values = parseValues(parts, cols, table);
 
-        return database -> {
+        return Execution.forModification(() -> {
             table.insert(toMap(cols, values));
-            System.out.println("Successfully inserted row");
-        };
+            return Modification.insert();
+        });
 
     }
 
@@ -215,7 +212,7 @@ public class Parser {
 
     }
 
-    private Query parseSelect(PeekableIterator<String> parts) throws SqlParseException {
+    private Execution parseSelect(PeekableIterator<String> parts) throws SqlParseException {
         try {
             Map<String, String> colNames = new LinkedHashMap<>();
             boolean all = false;
@@ -267,10 +264,7 @@ public class Parser {
 
             Comparator<Tuple> comp = parseOrderBy(parts);
 
-            return database -> {
-                Relation select = table.select(makeSelector(colNames, predicate, comp));
-                System.out.println(Formatter.toString(select));
-            };
+            return Execution.forQuery(() -> makeSelector(colNames, predicate, comp).select(table));
         } catch (NoSuchElementException e) {
             throw new SqlParseException("Incomplete sql SELECT statement");
         }
