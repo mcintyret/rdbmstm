@@ -9,10 +9,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import com.mcintyret.rdbmstm.collect.PeekableIterator;
@@ -26,9 +27,10 @@ import com.mcintyret.rdbmstm.core.Value;
 import com.mcintyret.rdbmstm.core.predicate.ColumnEquals;
 import com.mcintyret.rdbmstm.core.predicate.ColumnGreaterThan;
 import com.mcintyret.rdbmstm.core.predicate.ColumnLessThan;
+import com.mcintyret.rdbmstm.core.select.AliasingSelector;
 import com.mcintyret.rdbmstm.core.select.FilteringSelector;
 import com.mcintyret.rdbmstm.core.select.OrderingSelector;
-import com.mcintyret.rdbmstm.core.select.SelectingAndAliasingSelector;
+import com.mcintyret.rdbmstm.core.select.SelectingSelector;
 import com.mcintyret.rdbmstm.core.select.Selector;
 
 public class Parser {
@@ -216,7 +218,8 @@ public class Parser {
 
     private Execution parseSelect(PeekableIterator<String> parts) throws SqlParseException {
         try {
-            Map<String, String> colNames = new LinkedHashMap<>();
+            Map<String, String> aliases = new HashMap<>();
+            Set<String> cols = new LinkedHashSet<>();
             boolean all = false;
             String name = null;
             String alias = null;
@@ -233,9 +236,11 @@ public class Parser {
                         throw new SqlParseException("No alias specified after AS for column '" + name + "'");
                     }
                     if (name != null) {
-                        String key = alias == null ? name : alias;
-                        if (colNames.put(key, name) != null) {
-                            throw new SqlParseException("Duplicate column name or alias: " + key);
+                        if (alias != null && aliases.put(alias, name) != null) {
+                            throw new SqlParseException("Duplicate alias provided: " + alias);
+                        }
+                        if (!cols.add(alias == null ? name : alias)) {
+                            throw new SqlParseException("Duplicate column name selected: " + name);
                         }
                     }
                     if ("from".equals(part)) {
@@ -255,10 +260,9 @@ public class Parser {
                 }
             }
 
-            if (all && !colNames.isEmpty()) {
+            if (all && (!cols.isEmpty() || !aliases.isEmpty())) {
                 throw new SqlParseException("Cannot select * as well as named columns");
             }
-
 
             Table table = database.get(parts.next());
 
@@ -266,21 +270,26 @@ public class Parser {
 
             Comparator<Tuple> comp = parseOrderBy(parts);
 
-            return Execution.forQuery(() -> makeSelector(colNames, predicate, comp).select(table));
+            return Execution.forQuery(() -> makeSelector(cols, aliases, predicate, comp).select(table));
         } catch (NoSuchElementException e) {
             throw new SqlParseException("Incomplete sql SELECT statement");
         }
 
     }
 
-    private Selector makeSelector(Map<String, String> colNames, Predicate<Tuple> predicate, Comparator<Tuple> comp) {
-        Selector selector = !colNames.isEmpty() ? new SelectingAndAliasingSelector(colNames) : (Selector) relation -> {return relation;};
+    private Selector makeSelector(Set<String> columns, Map<String, String> aliases, Predicate<Tuple> predicate, Comparator<Tuple> comp) {
+        Selector selector = aliases.isEmpty() ? (Selector) relation -> {return relation;} : new AliasingSelector(aliases);
+
         if (predicate != null) {
             selector = selector.chain(new FilteringSelector(predicate));
         }
         if (comp != null) {
             selector = selector.chain(new OrderingSelector(comp));
         }
+        if (!columns.isEmpty()) {
+            selector = selector.chain(new SelectingSelector(columns));
+        }
+
         return selector;
     }
 

@@ -1,5 +1,7 @@
 package com.mcintyret.rdbmstm.core.select;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -10,17 +12,21 @@ import com.mcintyret.rdbmstm.core.Relation;
 import com.mcintyret.rdbmstm.core.Tuple;
 import com.mcintyret.rdbmstm.core.Value;
 
-public class SelectingAndAliasingSelector implements Selector {
+public class AliasingSelector implements Selector {
 
     private final Map<String, String> aliases;
 
-    public SelectingAndAliasingSelector(Map<String, String> aliases) {
-        this.aliases = aliases;
+    public AliasingSelector(Map<String, String> aliases) {
+        this.aliases = Collections.unmodifiableMap(aliases);
     }
 
     @Override
     public Relation select(Relation in) {
-        final Map<String, ColumnDefinition> cols = new AliasedMap<>(aliases, in.getColumnDefinitions());
+        final Map<String, String> allAliases = new HashMap<>(aliases);
+
+        in.getColumnNames().forEach(name -> allAliases.put(name, name));
+
+        final Map<String, ColumnDefinition> cols = new AliasedMap<>(allAliases, in.getColumnDefinitions());
 
         return new Relation() {
             @Override
@@ -30,7 +36,7 @@ public class SelectingAndAliasingSelector implements Selector {
 
                         @Override
                         protected Value doSelect(String colName) {
-                            return tuple.select(aliases.get(colName));
+                            return tuple.select(allAliases.get(colName));
                         }
 
                         @Override
@@ -38,7 +44,7 @@ public class SelectingAndAliasingSelector implements Selector {
                             return cols;
                         }
                     };
-                }).distinct();
+                });
             }
 
             @Override
@@ -47,5 +53,4 @@ public class SelectingAndAliasingSelector implements Selector {
             }
         };
     }
-
 }

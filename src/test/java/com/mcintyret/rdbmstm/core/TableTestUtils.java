@@ -96,11 +96,11 @@ public class TableTestUtils {
 
         StringBuilder sb = new StringBuilder();
         if (!inActualButNotExpected.isEmpty()) {
-            sb.append("In actual but not expected: \'");
+            sb.append("In actual but not expected: \n");
             inActualButNotExpected.forEach((o) -> sb.append(o).append("\n"));
         }
         if (!inExpectedButNotActual.isEmpty()) {
-            sb.append("In expected but not actual: \'");
+            sb.append("In expected but not actual: \n");
             inExpectedButNotActual.forEach((o) -> sb.append(o).append("\n"));
         }
 

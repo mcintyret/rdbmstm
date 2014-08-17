@@ -192,6 +192,28 @@ public class SelectTest {
         assertRelationsEqual(all, toRelation(newColDefs, expectedTable));
     }
 
+    public void shouldSelectColumnsNotAllAliasedColumnsRepeatedWithAlias() {
+        Relation all = parser.parse("select baz one, foo, bar three, baz, foo two, bar four from table_1;").executeQuery();
+
+        Object[][] expectedTable = new Object[][]{
+            {"testing", 15.46, 17, "testing", 15.46, 17},
+            {"foo", 13.0, 27, "foo", 13.0, 27},
+            {"this", 57735.12, 1, "this", 57735.12, 1},
+            {"is", 0.0007, 3486978, "is", 0.0007, 3486978},
+            {"testing", 1556.345, 8975, "testing", 1556.345, 8975}
+        };
+
+        Map<String, ColumnDefinition> newColDefs = new LinkedHashMap<>();
+        newColDefs.put("one", colDefs.get("baz"));
+        newColDefs.put("foo", colDefs.get("foo"));
+        newColDefs.put("three", colDefs.get("bar"));
+        newColDefs.put("baz", colDefs.get("baz"));
+        newColDefs.put("two", colDefs.get("foo"));
+        newColDefs.put("four", colDefs.get("bar"));
+
+        assertRelationsEqual(all, toRelation(newColDefs, expectedTable));
+    }
+
     public void shouldSelectColumnsNotAllAliasedWhereOnAliasedColumn() {
         Relation all = parser.parse("select baz one, foo, bar three from table_1 where three > 20;").executeQuery();
 
@@ -284,13 +306,12 @@ public class SelectTest {
     }
 
     public void shouldOrderByAscendingString() {
-        Relation all = parser.parse("select * from table_1 order by baz asc;").executeQuery();
+        Relation all = parser.parse("select * from table_1 where bar <> 17 order by baz asc;").executeQuery();
 
         Object[][] expectedTable = new Object[][]{
             {13.0, 27, "foo"},
             {0.0007, 3486978, "is"},
             {1556.345, 8975, "testing"},
-            {15.46, 17, "testing"},
             {57735.12, 1, "this"}
         };
 
@@ -298,13 +319,12 @@ public class SelectTest {
     }
 
     public void shouldOrderByAliasedColumn() {
-        Relation all = parser.parse("select foo, bar, baz as bam from table_1 order by bam asc;").executeQuery();
+        Relation all = parser.parse("select foo, bar, baz as bam from table_1 where bar <> 17 order by bam asc;").executeQuery();
 
         Object[][] expectedTable = new Object[][]{
             {13.0, 27, "foo"},
             {0.0007, 3486978, "is"},
             {1556.345, 8975, "testing"},
-            {15.46, 17, "testing"},
             {57735.12, 1, "this"}
         };
 
@@ -314,6 +334,56 @@ public class SelectTest {
         newColDefs.put("bam", colDefs.get("baz"));
 
         assertOrderedRelationsEqual(all, toRelation(newColDefs, expectedTable));
+    }
+
+    public void shouldOrderByAliasedColumnFiltered() {
+        Relation all = parser.parse("select foo shoe, bar, baz as bam from table_1 where (shoe > 14 and bar <> 17) order by bam asc;").executeQuery();
+
+        Object[][] expectedTable = new Object[][]{
+            {1556.345, 8975, "testing"},
+            {57735.12, 1, "this"}
+        };
+
+        Map<String, ColumnDefinition> newColDefs = new LinkedHashMap<>();
+        newColDefs.put("shoe", colDefs.get("foo"));
+        newColDefs.put("bar", colDefs.get("bar"));
+        newColDefs.put("bam", colDefs.get("baz"));
+
+        assertOrderedRelationsEqual(all, toRelation(newColDefs, expectedTable));
+    }
+
+    public void shouldFilterOnColumnNotSelected() {
+        Relation all = parser.parse("select bar from table_1 where foo > 14;").executeQuery();
+
+        Object[][] expectedTable = new Object[][]{
+            {17},
+            {1},
+            {8975}
+        };
+
+        Map<String, ColumnDefinition> newColDefs = new LinkedHashMap<>();
+        newColDefs.put("bar", colDefs.get("bar"));
+
+        assertRelationsEqual(all, toRelation(newColDefs, expectedTable));
+
+    }
+
+    public void shouldOrderByOnColumnNotSelected() {
+        Relation all = parser.parse("select bar from table_1 order by baz;").executeQuery();
+
+        Object[][] expectedTable = new Object[][]{
+            {27},
+            {3486978},
+            {8975},
+            {17},
+            {1}
+        };
+
+        Map<String, ColumnDefinition> newColDefs = new LinkedHashMap<>();
+        newColDefs.put("bar", colDefs.get("bar"));
+
+        assertRelationsEqual(all, toRelation(newColDefs, expectedTable));
+
     }
 
 }
