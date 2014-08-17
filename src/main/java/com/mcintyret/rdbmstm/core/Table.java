@@ -151,11 +151,16 @@ public class Table implements NamedRelation {
     public int delete(Predicate<Tuple> predicate) {
         // Can't do this one with streams sadly
         int count = 0;
-        Iterator<Row> tupleIt = rows.iterator();
-        while (tupleIt.hasNext()) {
-            if (predicate.test(tupleIt.next())) {
-                count++;
-                tupleIt.remove();
+        if (predicate == null) {
+            count = rows.size();
+            rows.clear();
+        } else {
+            Iterator<Row> tupleIt = rows.iterator();
+            while (tupleIt.hasNext()) {
+                if (predicate.test(tupleIt.next())) {
+                    count++;
+                    tupleIt.remove();
+                }
             }
         }
         return count;
