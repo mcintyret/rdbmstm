@@ -14,11 +14,6 @@ public class TableTestUtils {
     public static Relation toRelation(Map<String, ColumnDefinition> cols, Object[][] table) {
         return new Relation() {
             @Override
-            public String getName() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
             public Collection<String> getColumnNames() {
                 return cols.keySet();
             }
@@ -58,7 +53,6 @@ public class TableTestUtils {
     }
 
     public static void assertRelationEquals(Relation actual, Relation expected) {
-        // Don't care about name so much
         assertOrderedMaps(actual.getColumnDefinitions(), expected.getColumnDefinitions());
 
         List<? extends Iterable<Value>> actualValues =
@@ -121,11 +115,6 @@ public class TableTestUtils {
 
         @Override
         public Value select(String colName) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void set(String colName, Value value) {
             throw new UnsupportedOperationException();
         }
     }

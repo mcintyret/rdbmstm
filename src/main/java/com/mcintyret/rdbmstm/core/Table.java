@@ -3,7 +3,6 @@ package com.mcintyret.rdbmstm.core;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -15,10 +14,9 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import com.mcintyret.rdbmstm.SqlException;
-import com.mcintyret.rdbmstm.collect.AliasedMap;
-import com.mcintyret.rdbmstm.collect.OrderedSubsetUnmodifiableMap;
+import com.mcintyret.rdbmstm.core.select.Selector;
 
-public class Table implements Relation {
+public class Table implements NamedRelation {
 
     private final String name;
 
@@ -42,16 +40,10 @@ public class Table implements Relation {
 
     public void insert(Map<String, Value> values) {
 
-        final Map<String, Value> tupleValues = new HashMap<>();
         Row tuple = new Row() {
             @Override
             public Map<String, ColumnDefinition> getColumnDefinitions() {
                 return columnDefinitions;
-            }
-
-            @Override
-            public Map<String, Value> getValues() {
-                return tupleValues;
             }
         };
 
@@ -70,8 +62,8 @@ public class Table implements Relation {
             }
 
             if (!rows.add(tuple)) {
-                throw new SqlException("Values " + tuple.getValues().values() + " cannot be inserted into columns "
-                    + tuple.getValues().keySet() + ": duplicate row");
+                throw new SqlException("Values " + tuple + " cannot be inserted into columns "
+                    + tuple.getColumnNames() + ": duplicate row");
             }
         } catch (SqlException e) {
             // Rollback adding to the indices if one of them complained
@@ -169,56 +161,8 @@ public class Table implements Relation {
         return count;
     }
 
-    public Relation select(Map<String, String> colAliases, Predicate<Tuple> predicate, Comparator<Tuple> comp) {
-        final Map<String, ColumnDefinition> cols = colAliases.isEmpty() ?
-            getColumnDefinitions() :
-            new AliasedMap<>(colAliases, columnDefinitions);
-
-        Stream<? extends Row> rows = filter(predicate).map((tuple) -> {
-            final Map<String, Value> values = new OrderedSubsetUnmodifiableMap<>(tuple.getValues(), cols.keySet());
-
-            return new Row() {
-
-                @Override
-                public Map<String, ColumnDefinition> getColumnDefinitions() {
-                    return cols;
-                }
-
-                @Override
-                public Map<String, Value> getValues() {
-                    return values;
-                }
-            };
-        }).distinct();
-
-        final Stream<? extends Tuple> sortedRows = comp == null ? rows : rows.sorted(comp);
-
-        return new Relation() {
-            @Override
-            public String getName() {
-                return "Selection";
-            }
-
-            @Override
-            public Collection<String> getColumnNames() {
-                return cols.keySet();
-            }
-
-            @Override
-            public Stream<? extends Tuple> getValues() {
-                return sortedRows;
-            }
-
-            @Override
-            public Map<String, ColumnDefinition> getColumnDefinitions() {
-                return cols;
-            }
-        };
-    }
-
-
-    private Stream<Row> filter(Predicate<Tuple> predicate) {
-        return predicate == null ? rows.stream() : rows.stream().filter(predicate);
+    public Relation select(Selector selector) {
+        return selector.select(this);
     }
 
     @Override
@@ -232,7 +176,7 @@ public class Table implements Relation {
     }
 
     @Override
-    public Stream<? extends Row> getValues() {
+    public Stream<Row> getValues() {
         return rows.stream();
     }
 

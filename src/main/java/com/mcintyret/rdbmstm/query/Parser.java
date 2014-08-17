@@ -16,6 +16,7 @@ import java.util.NoSuchElementException;
 import java.util.function.Predicate;
 
 import com.mcintyret.rdbmstm.Formatter;
+import com.mcintyret.rdbmstm.collect.PeekableIterator;
 import com.mcintyret.rdbmstm.core.ColumnDefinition;
 import com.mcintyret.rdbmstm.core.DataType;
 import com.mcintyret.rdbmstm.core.Database;
@@ -26,6 +27,10 @@ import com.mcintyret.rdbmstm.core.Value;
 import com.mcintyret.rdbmstm.core.predicate.ColumnEquals;
 import com.mcintyret.rdbmstm.core.predicate.ColumnGreaterThan;
 import com.mcintyret.rdbmstm.core.predicate.ColumnLessThan;
+import com.mcintyret.rdbmstm.core.select.FilteringSelector;
+import com.mcintyret.rdbmstm.core.select.OrderingSelector;
+import com.mcintyret.rdbmstm.core.select.SelectingAndAliasingSelector;
+import com.mcintyret.rdbmstm.core.select.Selector;
 
 public class Parser {
 
@@ -180,7 +185,7 @@ public class Parser {
     private static Value parseValue(String val, String colName, Relation relation) throws SqlParseException {
         ColumnDefinition cd = relation.getColumnDefinitions().get(colName);
         if (cd == null) {
-            throw new SqlParseException("No column '" + colName + "' exists on table '" + relation.getName() + "'");
+            throw new SqlParseException("No column '" + colName + "' exists on table");
         }
 
         return parseValue(val, cd.getDataType());
@@ -263,7 +268,7 @@ public class Parser {
             Comparator<Tuple> comp = parseOrderBy(parts);
 
             return database -> {
-                Relation select = table.select(colNames, predicate, comp);
+                Relation select = table.select(makeSelector(colNames, predicate, comp));
                 System.out.println(Formatter.toString(select));
             };
         } catch (NoSuchElementException e) {
@@ -272,7 +277,18 @@ public class Parser {
 
     }
 
-    private Comparator<Tuple> parseOrderBy(PeekableIterator<String> parts) {
+    private Selector makeSelector(Map<String, String> colNames, Predicate<Tuple> predicate, Comparator<Tuple> comp) {
+        Selector selector = predicate != null ? new FilteringSelector(predicate) : (Selector) relation -> {return relation;};
+        if (!colNames.isEmpty()) {
+            selector = selector.chain(new SelectingAndAliasingSelector(colNames));
+        }
+        if (comp != null) {
+            selector = selector.chain(new OrderingSelector(comp));
+        }
+        return selector;
+    }
+
+    private Comparator<Tuple> parseOrderBy(PeekableIterator <String> parts) {
         if (consumeIfPresent("order", parts)) {
             assertNextToken("by", parts);
             Comparator<Tuple> comp = columnComparator(parts.next());
@@ -547,12 +563,6 @@ public class Parser {
     static interface ParseFunction<T> {
 
         T apply(String str) throws SqlParseException;
-
-    }
-
-    interface PeekableIterator<T> extends Iterator<T> {
-
-        T peek();
 
     }
 

@@ -6,5 +6,9 @@
 • More Datatypes
 • Dropping
 • Creating
+• GroupBy
 
 • Transactions!!?!??!?!?!?!!!?
+
+BUGS
+• Can't OrderBy on a column that isn't selected (is that a bug??)
