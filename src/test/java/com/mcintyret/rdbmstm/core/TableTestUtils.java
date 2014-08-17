@@ -2,10 +2,12 @@ package com.mcintyret.rdbmstm.core;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,8 +54,20 @@ public class TableTestUtils {
         return list;
     }
 
-    public static void assertRelationEquals(Relation actual, Relation expected) {
-        assertOrderedMaps(actual.getColumnDefinitions(), expected.getColumnDefinitions());
+    public static void assertRelationsEqual(Relation actual, Relation expected) {
+        assertOrderedMapsEqual(actual.getColumnDefinitions(), expected.getColumnDefinitions());
+
+        Set<? extends Iterable<Value>> actualValues =
+            actual.getValues().collect(Collectors.<Iterable<Value>>toSet());
+
+        Set<? extends Iterable<Value>> expectedValues =
+            expected.getValues().collect(Collectors.<Iterable<Value>>toSet());
+
+        assertUnorderedSetsEqual(actualValues, expectedValues);
+    }
+
+    public static void assertOrderedRelationsEqual(Relation actual, Relation expected) {
+        assertOrderedMapsEqual(actual.getColumnDefinitions(), expected.getColumnDefinitions());
 
         List<? extends Iterable<Value>> actualValues =
             actual.getValues().collect(Collectors.<Iterable<Value>>toList());
@@ -65,15 +79,37 @@ public class TableTestUtils {
     }
 
 
-    private static void assertOrderedMaps(Map<?, ?> actual, Map<?, ?> expected) {
+    public static void assertOrderedMapsEqual(Map<?, ?> actual, Map<?, ?> expected) {
         assertIterablesEqual(actual.entrySet(), expected.entrySet());
     }
 
-    private static void assertIterablesEqual(Iterable<?> actual, Iterable<?> expected) {
+    public static void assertIterablesEqual(Iterable<?> actual, Iterable<?> expected) {
         assertIteratorsEqual(actual.iterator(), expected.iterator());
     }
 
-    private static void assertIteratorsEqual(Iterator<?> actual, Iterator<?> expected) {
+    public static void assertUnorderedSetsEqual(Set<?> actual, Set<?> expected) {
+        Set<?> inActualButNotExpected = new HashSet<>(actual);
+        inActualButNotExpected.removeAll(expected);
+
+        Set<?> inExpectedButNotActual = new HashSet<>(expected);
+        inExpectedButNotActual.removeAll(actual);
+
+        StringBuilder sb = new StringBuilder();
+        if (!inActualButNotExpected.isEmpty()) {
+            sb.append("In actual but not expected: \'");
+            inActualButNotExpected.forEach((o) -> sb.append(o).append("\n"));
+        }
+        if (!inExpectedButNotActual.isEmpty()) {
+            sb.append("In expected but not actual: \'");
+            inExpectedButNotActual.forEach((o) -> sb.append(o).append("\n"));
+        }
+
+        if (sb.length() != 0) {
+            throw new AssertionError(sb.toString());
+        }
+    }
+
+    public static void assertIteratorsEqual(Iterator<?> actual, Iterator<?> expected) {
         int count = 0;
         while (actual.hasNext()) {
             count++;
@@ -95,7 +131,7 @@ public class TableTestUtils {
         }
     }
 
-    private static class SimpleListTuple implements Tuple {
+    private static class SimpleListTuple extends AbstractTuple {
 
         private final List<Value> list;
 
@@ -109,12 +145,12 @@ public class TableTestUtils {
         }
 
         @Override
-        public Map<String, ColumnDefinition> getColumnDefinitions() {
+        protected Value doSelect(String colName) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public Value select(String colName) {
+        public Map<String, ColumnDefinition> getColumnDefinitions() {
             throw new UnsupportedOperationException();
         }
     }

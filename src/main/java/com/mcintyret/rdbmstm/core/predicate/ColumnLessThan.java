@@ -1,11 +1,9 @@
 package com.mcintyret.rdbmstm.core.predicate;
 
-import com.mcintyret.rdbmstm.core.Value;
-
 public class ColumnLessThan extends NumericColumnPredicate {
 
-    public ColumnLessThan(String columnName, Value val) {
-        super(columnName, val);
+    public ColumnLessThan(String columnName, double test) {
+        super(columnName, test);
     }
 
     @Override

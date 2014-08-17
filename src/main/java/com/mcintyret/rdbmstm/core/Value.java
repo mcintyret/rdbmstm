@@ -4,6 +4,8 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
 
+import com.mcintyret.rdbmstm.SqlException;
+
 public class Value implements Comparable<Value> {
 
     private final DataType dataType;
@@ -39,6 +41,30 @@ public class Value implements Comparable<Value> {
 
     public static Value nullOf(DataType dataType) {
         return NULL_VALUE_CACHE.get(dataType);
+    }
+
+    public static Value parse(String val, DataType dataType) {
+        if ("null".equals(val)) {
+            return Value.nullOf(dataType);
+        }
+        try {
+            switch (dataType) {
+                case STRING:
+                    if (!val.startsWith("'") || !val.endsWith("'")) {
+                        throw new SqlException("Illegal string format: <" + val + "> must be wrapped in single quotes");
+                    }
+                    return Value.of(val.substring(1, val.length() - 1));
+                case INTEGER:
+                    return Value.of(Long.parseLong(val));
+                case FLOAT:
+                    return Value.of(Double.parseDouble(val));
+                default:
+                    throw new SqlException("Unsupported DataType: " + dataType);
+            }
+        } catch (NumberFormatException e) {
+            throw new SqlException("Illegal number format for DataType " + dataType + ": '" + val + "'", e);
+        }
+
     }
 
     @Override

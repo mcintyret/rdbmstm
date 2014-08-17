@@ -57,6 +57,8 @@ public class Parser {
                 default:
                     throw new SqlParseException("Cannot parse query: " + sql);
             }
+        } catch (NumberFormatException e) {
+            throw new SqlParseException("Error parsing invalid number format", e);
         } catch (NoSuchElementException e) {
             throw new SqlParseException("SQL statement truncated unexpectedly: " + sql);
         } catch (SqlParseException e) {
@@ -71,7 +73,7 @@ public class Parser {
 
         Table table = database.get(parts.next());
 
-        Predicate<Tuple> predicate = parseWhere(parts, table);
+        Predicate<Tuple> predicate = parseWhere(parts);
 
         return Execution.forModification(() -> Modification.delete(table.delete(predicate)));
     }
@@ -113,7 +115,7 @@ public class Parser {
             throw new SqlParseException("Must update at least one column in UPDATE statment");
         }
 
-        Predicate<Tuple> predicate = parsePredicate(parts, table);
+        Predicate<Tuple> predicate = parsePredicate(parts);
 
         return Execution.forModification(() -> { return Modification.update(table.update(values, predicate)); });
     }
@@ -260,7 +262,7 @@ public class Parser {
 
             Table table = database.get(parts.next());
 
-            Predicate<Tuple> predicate = parseWhere(parts, table);
+            Predicate<Tuple> predicate = parseWhere(parts);
 
             Comparator<Tuple> comp = parseOrderBy(parts);
 
@@ -272,9 +274,9 @@ public class Parser {
     }
 
     private Selector makeSelector(Map<String, String> colNames, Predicate<Tuple> predicate, Comparator<Tuple> comp) {
-        Selector selector = predicate != null ? new FilteringSelector(predicate) : (Selector) relation -> {return relation;};
-        if (!colNames.isEmpty()) {
-            selector = selector.chain(new SelectingAndAliasingSelector(colNames));
+        Selector selector = !colNames.isEmpty() ? new SelectingAndAliasingSelector(colNames) : (Selector) relation -> {return relation;};
+        if (predicate != null) {
+            selector = selector.chain(new FilteringSelector(predicate));
         }
         if (comp != null) {
             selector = selector.chain(new OrderingSelector(comp));
@@ -390,28 +392,28 @@ public class Parser {
     }
 
 
-    private Predicate<Tuple> parseWhere(PeekableIterator<String> parts, Relation relation) throws SqlParseException {
+    private Predicate<Tuple> parseWhere(PeekableIterator<String> parts) throws SqlParseException {
         if (consumeIfPresent("where", parts)) {
 
-            return parsePredicate(parts, relation);
+            return parsePredicate(parts);
         }
         return null;
     }
 
     // TODO: support AND and OR without brackets
-    private Predicate<Tuple> parsePredicate(Iterator<String> parts, Relation relation) throws SqlParseException {
+    private Predicate<Tuple> parsePredicate(Iterator<String> parts) throws SqlParseException {
         String part = parts.next();
 
         if ("not".equals(part)) {
-            return parsePredicate(parts, relation).negate();
+            return parsePredicate(parts).negate();
         }
 
         if ("(".equals(part)) {
-            Predicate<Tuple> left = parsePredicate(parts, relation);
+            Predicate<Tuple> left = parsePredicate(parts);
 
             boolean and = parseAndOr(parts);
 
-            Predicate<Tuple> right = parsePredicate(parts, relation);
+            Predicate<Tuple> right = parsePredicate(parts);
 
             assertNextToken(")", parts); // consume closing parenthesis
 
@@ -438,7 +440,7 @@ public class Parser {
         if (type == null) {
             throw new SqlParseException("Unknown predicate in WHERE clause");
         }
-        return type.makePredicate(colName, parseValue(val, colName, relation));
+        return type.makePredicate(colName, val);
     }
 
     // TODO handle IS and IS NOT
@@ -467,37 +469,37 @@ public class Parser {
     enum PredicateType {
         EQ(PredicatePart.EQ) {
             @Override
-            Predicate<Tuple> makePredicate(String colName, Value val) {
+            Predicate<Tuple> makePredicate(String colName, String val) {
                 return new ColumnEquals(colName, val);
             }
         },
         NE(PredicatePart.LT, PredicatePart.GT) {
             @Override
-            Predicate<Tuple> makePredicate(String colName, Value val) {
+            Predicate<Tuple> makePredicate(String colName, String val) {
                 return EQ.makePredicate(colName, val).negate();
             }
         },
         GT(PredicatePart.GT) {
             @Override
-            Predicate<Tuple> makePredicate(String colName, Value val) {
-                return new ColumnGreaterThan(colName, val);
+            Predicate<Tuple> makePredicate(String colName, String val) {
+                return new ColumnGreaterThan(colName, Double.parseDouble(val));
             }
         },
         GTE(PredicatePart.GT, PredicatePart.EQ) {
             @Override
-            Predicate<Tuple> makePredicate(String colName, Value val) {
+            Predicate<Tuple> makePredicate(String colName, String val) {
                 return LT.makePredicate(colName, val).negate();
             }
         },
         LT(PredicatePart.LT) {
             @Override
-            Predicate<Tuple> makePredicate(String colName, Value val) {
-                return new ColumnLessThan(colName, val);
+            Predicate<Tuple> makePredicate(String colName, String val) {
+                return new ColumnLessThan(colName, Double.parseDouble(val));
             }
         },
         LTE(PredicatePart.LT, PredicatePart.EQ) {
             @Override
-            Predicate<Tuple> makePredicate(String colName, Value val) {
+            Predicate<Tuple> makePredicate(String colName, String val) {
                 return GT.makePredicate(colName, val).negate();
             }
         };
@@ -508,7 +510,7 @@ public class Parser {
             this.parts = Arrays.asList(parts);
         }
 
-        abstract Predicate<Tuple> makePredicate(String colName, Value val);
+        abstract Predicate<Tuple> makePredicate(String colName, String val);
 
         static final Map<List<PredicatePart>, PredicateType> PARTS_MAP = makePartsMap();
 
@@ -563,4 +565,5 @@ public class Parser {
     private static Comparator<Tuple> columnComparator(final String columnName) {
         return (left, right) -> left.select(columnName).compareTo(right.select(columnName));
     }
+
 }
