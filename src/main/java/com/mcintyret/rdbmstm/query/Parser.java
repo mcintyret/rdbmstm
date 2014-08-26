@@ -32,7 +32,10 @@ import com.mcintyret.rdbmstm.core.select.FilteringSelector;
 import com.mcintyret.rdbmstm.core.select.OrderingSelector;
 import com.mcintyret.rdbmstm.core.select.SelectingSelector;
 import com.mcintyret.rdbmstm.core.select.Selector;
+import com.mcintyret.rdbmstm.core.select.aggregate.AggregatingFunction;
+import com.mcintyret.rdbmstm.core.select.aggregate.Aggregators;
 
+// TODO: split this class out!
 public class Parser {
 
     private final Database database;
@@ -213,16 +216,17 @@ public class Parser {
         } catch (NumberFormatException e) {
             throw new SqlParseException("Illegal number format for DataType " + dataType + ": '" + val + "'", e);
         }
-
     }
 
     private Execution parseSelect(PeekableIterator<String> parts) throws SqlParseException {
         try {
             Map<String, String> aliases = new HashMap<>();
+            Map<String, AggregatingFunction> functions = new HashMap<>();
             Set<String> cols = new LinkedHashSet<>();
             boolean all = false;
             String name = null;
             String alias = null;
+            AggregatingFunction func;
             boolean as = false;
             while (parts.hasNext()) {
                 String part = parts.next();
@@ -247,13 +251,22 @@ public class Parser {
                         break;
                     } else {
                         name = alias = null;
+                        func = null;
                         as = false;
                     }
                 } else if ("as".equals(part)) {
                     as = true;
                 } else {
                     if (name == null) {
-                        name = part;
+                        func = Aggregators.getAggregator(name);
+                        if (func == null) {
+                            name = part;
+                        } else {
+                            assertNextToken("(", parts);
+                            name = parts.next();
+                            assertNextToken(")", parts);
+                            functions.put(name, func);
+                        }
                     } else {
                         alias = part;
                     }
